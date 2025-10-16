@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+
+const { execSync } = require('child_process');
+const path = require('path');
+
+// 프로젝트에서 자주 사용되는 도메인 단어 사전
+const PROJECT_DICTIONARY = {
+  
+  apple: ['appel', 'apppl'],
+
+  // 일반 UI/UX 용어
+  header: ['headr', 'heaeder', 'heder', 'headder'],
+  footer: ['footr', 'foooter', 'fotter', 'footeer'],
+
+  // 데이터/API 용어
+  response: ['respone', 'responsse', 'resposne', 'responee'],
+  request: ['reqeust', 'requset', 'requeset', 'reuqest'],
+  profile: ['profiel', 'proifle', 'prfile', 'profle'],
+  account: ['acount', 'accout', 'acconut', 'accont'],
+  document: ['documnet', 'docuemnt', 'documetn', 'documnt'],
+  history: ['histroy', 'histoyr', 'histor', 'hisotry'],
+  complete: ['comlete', 'complte', 'compelte', 'coplete'],
+  confirm: ['cofirm', 'confrm', 'confirrm', 'confrim'],
+
+  // 액션/상태
+  select: ['selct', 'selecct', 'seelct', 'seleect'],
+  change: ['chagne', 'chnage', 'changge', 'cahange'],
+  create: ['craete', 'creat', 'creatte', 'crete'],
+  update: ['updat', 'updaate', 'updatte', 'udate'],
+  delete: ['delet', 'deletee', 'delette', 'deelte'],
+  search: ['serach', 'seacrh', 'searrch', 'sarch'],
+  filter: ['filtr', 'fiter', 'fileter', 'filer'],
+  sort: ['srot', 'sorrt', 'sot', 'soort'],
+};
+
+// Levenshtein 거리 계산 (유사도 측정)
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1, // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[str2.length][str1.length];
+}
+
+// 파일명에서 단어 추출 (PascalCase, camelCase, kebab-case 지원)
+function extractWords(filename) {
+  // 확장자 제거
+  const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+
+  // 다양한 케이스를 고려해서 단어 추출
+  const words = [];
+
+  // kebab-case, snake_case 처리
+  const kebabWords = nameWithoutExt.split(/[-_]/);
+  kebabWords.forEach((word) => {
+    if (word.length > 1) {
+      // PascalCase/camelCase 처리
+      const camelWords = word.split(/(?=[A-Z])/);
+      camelWords.forEach((w) => {
+        if (w.length > 1) {
+          words.push(w.toLowerCase());
+        }
+      });
+    }
+  });
+
+  return [...new Set(words)]; // 중복 제거
+}
+
+// 오타 검사
+function checkSpelling(words, filename) {
+  const errors = [];
+
+  for (const word of words) {
+    // 3글자 미만은 체크하지 않음 (너무 짧은 단어들)
+    if (word.length < 3) continue;
+
+    // 숫자만 있는 경우 제외
+    if (/^\d+$/.test(word)) continue;
+
+    // 알려진 올바른 단어인지 체크
+    const correctWords = Object.keys(PROJECT_DICTIONARY);
+
+    if (correctWords.includes(word)) {
+      continue; // 올바른 단어
+    }
+
+    // 오타 패턴 매칭
+    let foundCorrection = null;
+    let minDistance = Infinity;
+
+    for (const [correct, typos] of Object.entries(PROJECT_DICTIONARY)) {
+      // 직접적인 오타 패턴 매칭
+      if (typos.includes(word)) {
+        foundCorrection = correct;
+        break;
+      }
+
+      // 레벤슈타인 거리로 유사도 체크 (거리 2 이하면 오타 가능성)
+      const distance = levenshteinDistance(word, correct);
+      if (
+        distance <= 2 &&
+        distance < minDistance &&
+        word.length >= correct.length - 2
+      ) {
+        minDistance = distance;
+        foundCorrection = correct;
+      }
+    }
+
+    if (foundCorrection) {
+      errors.push({
+        word,
+        suggestion: foundCorrection,
+        filename,
+      });
+    }
+  }
+
+  return errors;
+}
+
+function getStagedFiles() {
+  try {
+    const output = execSync('git diff --cached --name-only --diff-filter=A', {
+      encoding: 'utf8',
+    });
+    return output
+      .trim()
+      .split('\n')
+      .filter((file) => file.length > 0);
+  } catch (error) {
+    return [];
+  }
+}
+
+function main() {
+  const stagedFiles = getStagedFiles();
+
+  if (stagedFiles.length === 0) {
+    console.log('✅ 새로 추가된 파일이 없습니다.');
+    return;
+  }
+
+  console.log('🔍 오타 검사 시작\n');
+
+  let hasErrors = false;
+
+  for (const file of stagedFiles) {
+    // JS/TS/TSX 파일만 체크
+    if (!/\.(js|jsx|ts|tsx)$/.test(file)) continue;
+
+    const filename = path.basename(file);
+    const words = extractWords(filename);
+    const spellingErrors = checkSpelling(words, filename);
+
+    if (spellingErrors.length > 0) {
+      hasErrors = true;
+      console.log(`❌ ${file}:`);
+      spellingErrors.forEach((error) => {
+        console.log(`   "${error.word}" → "${error.suggestion}" 로 수정하세요`);
+      });
+      console.log('');
+    } else {
+      console.log(`✅ ${file}: 오타가 없습니다.`);
+    }
+  }
+
+  if (hasErrors) {
+    console.log('💡 파일명 오타가 발견되었습니다!');
+    console.log(
+      '   파일명을 수정하거나 --no-verify 옵션으로 무시할 수 있습니다.',
+    );
+    process.exit(1);
+  }
+
+  console.log('\n✅ 모든 파일명의 단어가 올바릅니다!');
+}
+
+main();
