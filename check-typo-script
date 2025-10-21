@@ -4,11 +4,43 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 // 프로젝트에서 자주 사용되는 도메인 단어 사전
+// 명사위주 (동사는 ~ed 등의 형변환이 잦음)
 const PROJECT_DICTIONARY = {
-  
-  apple: ['appel', 'apppl'],
+  // 투자/금융 도메인
+  tendency: ['tendnecy', 'tendancy', 'tendecy', 'tendeny'],
+  investment: ['investement', 'invesment', 'investmnet', 'investmnt'],
+  portfolio: ['portfollio', 'portofolio', 'portfilio', 'porfolio'],
+  contract: ['contarct', 'contrcat', 'contrat', 'contraact'],
+  settlement: ['settlemnt', 'setlement', 'settlment', 'settelment'],
+  quarterly: ['quartely', 'quaterley', 'quarteley', 'quaterly'],
+  rebalancing: ['rebalacning', 'rebalaning', 'reblancing', 'rebalacning'],
+  withdrawal: ['withdrawl', 'withdrawel', 'withdawal', 'withdarwal'],
+  strategy: ['straegy', 'strategey', 'stratgey', 'stratagy'],
+  algorithm: ['algoritm', 'algorithym', 'algorithem', 'algorith'],
+  commission: ['commision', 'comission', 'commisson', 'comissoin'],
+
+  // 인증/사용자
+  authentication: [
+    'authenticaton',
+    'authentifcation',
+    'authentiction',
+    'authenticaiton',
+  ],
+  registration: ['registartion', 'registraton', 'regsitration', 'registraion'],
+  termination: ['temination', 'terminaton', 'terminaion', 'termnation'],
+  authorization: [
+    'authorisation',
+    'authorizzation',
+    'authorizaton',
+    'authoriztion',
+  ],
 
   // 일반 UI/UX 용어
+  management: ['managment', 'managemnt', 'managemet', 'managemenet'],
+  navigation: ['navigaton', 'navigaion', 'navigationn', 'naviation'],
+  component: ['compoennt', 'componet', 'compnent', 'componnt'],
+  button: ['buttn', 'buton', 'buttton', 'butotn'],
+  modal: ['modall', 'modle', 'modeal', 'modla'],
   header: ['headr', 'heaeder', 'heder', 'headder'],
   footer: ['footr', 'foooter', 'fotter', 'footeer'],
 
@@ -19,18 +51,6 @@ const PROJECT_DICTIONARY = {
   account: ['acount', 'accout', 'acconut', 'accont'],
   document: ['documnet', 'docuemnt', 'documetn', 'documnt'],
   history: ['histroy', 'histoyr', 'histor', 'hisotry'],
-  complete: ['comlete', 'complte', 'compelte', 'coplete'],
-  confirm: ['cofirm', 'confrm', 'confirrm', 'confrim'],
-
-  // 액션/상태
-  select: ['selct', 'selecct', 'seelct', 'seleect'],
-  change: ['chagne', 'chnage', 'changge', 'cahange'],
-  create: ['craete', 'creat', 'creatte', 'crete'],
-  update: ['updat', 'updaate', 'updatte', 'udate'],
-  delete: ['delet', 'deletee', 'delette', 'deelte'],
-  search: ['serach', 'seacrh', 'searrch', 'sarch'],
-  filter: ['filtr', 'fiter', 'fileter', 'filer'],
-  sort: ['srot', 'sorrt', 'sot', 'soort'],
 };
 
 // Levenshtein 거리 계산 (유사도 측정)
